@@ -25,8 +25,8 @@ def trainNet(sizeOfNet, testFunc, numGenerations):
                 bestGenScore = testScores[i]
         avgScore = avgScore/100
         print("AVG SCORE GEN:"+str(gen)+ " is " + str(avgScore))
-        #print("BEST SCORE GEN:" + str(bestGenScore))
-        #print("BEST SCORE OVERALL:" + str(absMax))
+        print("BEST SCORE GEN:" + str(bestGenScore))
+        print("BEST SCORE OVERALL:" + str(absMax))
         #nets.extend(bestNets)
         #testScores.extend(bestScores)
         bestNets = []
@@ -37,8 +37,8 @@ def trainNet(sizeOfNet, testFunc, numGenerations):
             bestNets.append(nets[i])
             bestScores.append(testScores[i])
         
-        for i in testFunc(bestNets):
-            print(i)
+        #for i in testFunc(bestNets):
+        #    print(i)
 
         nets = nextGen(sizeOfNet, bestNets)
         #nets.extend(bestNets)
