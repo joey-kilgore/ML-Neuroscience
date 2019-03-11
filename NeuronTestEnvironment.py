@@ -31,9 +31,10 @@ def neuronTest(nets):
             # feed input in network
             output = NN.calcNetwork(net, inputs)
             # set extracellular voltage from NN output
-            newCurrent = output[0]*2000000 - 1000000
+            newCurrent1 = output[0]*2000000 - 1000000
+            newCurrent2 = output[1]*2000000 - 1000000
             #print(newVolt)
-            hocCommand = 'electrode_api_advance('+str(newCurrent)+')'
+            hocCommand = 'electrode_api_advance('+str(newCurrent1)+','+str(newCurrent2)+')'
             h(hocCommand)
             # take a single time step
             h('steprun()')
@@ -60,6 +61,7 @@ def setEnvironment():
     h('setStim(0,0,0)')
     h('tstop = 5')
     h('wavesel[1] = 0')
+    h('electrode_api_change_pos(1000,-2000,2000)')
 
 setEnvironment()
 
