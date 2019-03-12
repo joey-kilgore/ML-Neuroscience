@@ -14,20 +14,17 @@ def neuronTest(nets):
     progress = 0
     printProgressBar(0, 100, prefix = 'Progress:', suffix = 'Complete', length = 50)
     startTime = time.time()
+    leftSpike = 0
+    rightSpike = 0
     for net in nets:
         h('init()')
         h('steprun()') # init step
         score = 0
-        for steps in range(300):
+        for steps in range(10000):
             # gather inputs
             inputs = []
-            inputs.append(.8) # m value wanted
-            #inputs.append(.8) # h value wanted
-            inputs.append(h.node[50].m_axnode)  # actual m value
-            inputs.append(h.node[50].h_axnode)  # actual h value
-            inputs.append(h.node[50].mp_axnode) # actual n value
-            inputs.append(h.node[50].s_axnode)  # actual s value
-            inputs.append(h.node[50].v)
+            for i in range(101):
+                inputs.append(h.node[i].v/100)
             # feed input in network
             output = NN.calcNetwork(net, inputs)
             # set extracellular voltage from NN output
@@ -39,7 +36,17 @@ def neuronTest(nets):
             # take a single time step
             h('steprun()')
             # calc score
-            score += 1-abs(.8-h.node[50].m_axnode)#-abs(.8-h.node[50].h_axnode)
+            if (h.node[90].v > -10) and (rightSpike == 0):
+                rightSpike = 1
+                score += 1
+            if (h.node[90].v < -10) and (rightSpike == 1):
+                rightSpike = 0
+            if (h.node[10].v > -10) and (leftSpike == 0):
+                leftSpike = 1
+                score += 1
+            if (h.node[10].v < -10) and (leftSpike == 1):
+                leftSpike = 0
+                
         scores.append(score)
         progress+=1
         printProgressBar(progress, 100, prefix = 'Progress:', suffix = 'Complete', length = 50)

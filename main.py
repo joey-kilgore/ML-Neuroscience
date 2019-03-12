@@ -29,4 +29,4 @@ def testGame(nets):
     return scores
 
 NTE.setEnvironment()
-Train.trainNet([6,20,20,2], NTE.neuronTest, 100)
+Train.trainNet([101,20,20,2], NTE.neuronTest, 100)
