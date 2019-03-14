@@ -63,11 +63,7 @@ def neuronTest(nets):
 
 
 def setEnvironment():
-    h.amp1 = 0
-    h('sinestim()')
-    h('setStim(0,0,0)')
-    h('tstop = 5')
-    h('wavesel[1] = 0')
+    h('electrode_api_setup()')
     h('electrode_api_change_pos(1000,-2000,2000)')
 
 setEnvironment()
