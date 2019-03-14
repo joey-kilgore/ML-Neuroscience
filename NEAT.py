@@ -1,5 +1,6 @@
 import math 
-import random 
+from random import *
+import copy
 
 mutationList = []   # The global list of connections
 
@@ -32,8 +33,8 @@ def calcNetwork(genome, inputs):
     #   when there are no more items in the queue then the network has been calculated
     nodeQueue = setInputNodes(nodes, inputs)    # The input nodes are set, and the process of calculating the outputs 
     while len(nodeQueue) > 0:   # Loop until all nodes have been processed
-        curNode = nodeQueue.popleft()   # Dequeue the next node
-
+        curNode = nodeQueue[0]   # Dequeue the next node
+        nodeQueue = nodeQueue[1:]
         if len(curNode.connections) == 0:   # If a node has no connections then it must be an output node
             outputs[curNode.index] = curNode.value    #   and its value is added to the outputs dictionary
         
@@ -41,8 +42,8 @@ def calcNetwork(genome, inputs):
             for con in curNode.connections:
                 nodes[con.end].value += con.weight * curNode.value  # The weight * value is added to the next nodes value
                 nodes[con.end].calcedInputs+=1  # The number of calculated inputs is incrememted
-                if nodes[con.end].numInputs == nodes[con.end].calcedInputs: # All inputs have been calculated and the node can be activated
-                    nodes[con.end].value = activationFunction(nodes[con.end.value])
+                if nodes[con.end].numInputs == nodes[con.end].calcedInputs : # All inputs have been calculated and the node can be activated
+                    nodes[con.end].value = activationFunction(nodes[con.end].value)
                     nodeQueue.append(nodes[con.end])    # After activating the node, it can be appended to the queue to be processed
     
     return outputs # The final outputs are returned
@@ -64,7 +65,8 @@ def makeNodeList(genome):
     return nodeList 
 
 def setInputNodes(nodes, inputs):
-    index = 1
+    index = 0
+    inputNodes = []
     # Setting the inputs takes advantage of knowing that the first nodes of the list must be the input nodes
     # This is known based on the fact the initial nodes are indexed as the first nodes, and then the output, and
     #   then all hidden nodes are created and have higher indexes because they are created later on after mutations
@@ -72,5 +74,17 @@ def setInputNodes(nodes, inputs):
         nodes[index].value = value  # Set the value of the input node
         if nodes[index].numInputs > 0:  # Ensure that the node is actually an input
             print("ERROR INPUT CONNECTIONS ON INPUT NODE")
+        inputNodes.append(nodes[index])
         index += 1
-    return nodes[:(index-1)]
+    return inputNodes
+
+def initGenome(numInputs, numOutputs):
+    global mutationList
+    for inputIndex in range(numInputs):
+        for outputIndex in range(numOutputs):
+            mutationList.append(Connection(inputIndex, outputIndex+numInputs, random()*2-1, 1))
+    return copy.deepcopy(mutationList)
+
+def printGenome(genome):
+    for con in genome:
+        print(str(con.start) + "->" + str(con.end) + "  " + ("ENABLED" if con.enabled == 1 else "DISABLED"))
