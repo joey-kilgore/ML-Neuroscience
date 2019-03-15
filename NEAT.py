@@ -2,11 +2,14 @@ import math
 from random import *
 import copy
 
-mutationList = []   # The global list of connections
+mutationDictionary = {}   # The global list of connections
+nodeCount = 0
+geneCount = 0
 
 class Connection:  
     # The connection stores information for how two nodes are connected
-    def __init__(self, startNode, endNode, w, enabled):
+    def __init__(self, genomeIndex, startNode, endNode, w, enabled):
+        self.index = genomeIndex
         self.start = startNode  
         self.end = endNode
         self.weight = w
@@ -79,12 +82,56 @@ def setInputNodes(nodes, inputs):
     return inputNodes
 
 def initGenome(numInputs, numOutputs):
-    global mutationList
-    for inputIndex in range(numInputs):
-        for outputIndex in range(numOutputs):
-            mutationList.append(Connection(inputIndex, outputIndex+numInputs, random()*2-1, 1))
-    return copy.deepcopy(mutationList)
+    # initGenome is meant to be used for creating genomes with no parents, ie the initial genomes
+    global mutationDictionary   # the mutationDictionary is needed for a global collection of all genomes
+    global nodeCount            # nodeCount keeps track of how many nodes have been created across all genomes
+    global geneCount            # genomeCount keeps track of hamny new genes have been created
+    initGenes = []   # initGene stores the new genome being created
+    # The simplest (ie original) genome is simply having all input nodes have a single direct connection to all output nodes
+    for inputIndex in range(numInputs):             # Loop through every input node
+        for outputIndex in range(numOutputs):       # Loop through every output node
+            # Create the connection between input and output node with the following parameters
+            # connection index = current geneCount, and is needed for looking up the gene in the global mutationDictionary
+            # starting node = the input index which goes from 0 to len(numInputs)-1
+            # ending node = the outputIndex+numInputs which goes from len(numInputs) to len(numInputs)+len(numOutputs)-1 
+            # weight = random number from -1 to 1
+            # enabled = 1 (ie the connection is enabled)
+            con = Connection(geneCount, inputIndex, outputIndex+numInputs, random()*2-1, 1) 
+            mutationDictionary[geneCount] = con     # the node is added to the global list of genes
+            initGenes.append(copy.copy(con))    # a copy is appended to the initial genome being created
+            geneCount+=1    # a new gene was created so the geneCount is incremented
+
+    nodeCount = numInputs+numOutputs # the number of new nodes created
+    return initGenes    # return the new genome
 
 def printGenome(genome):
+    # printGenome gives a way of looking at all the genes of a genome
     for con in genome:
-        print(str(con.start) + "->" + str(con.end) + "  " + ("ENABLED" if con.enabled == 1 else "DISABLED"))
+        print(str(con.index) + "\t" + str(con.start) + "->" + str(con.end) + "\t" + (str(con.weight) if con.enabled == 1 else "DISABLED"))
+
+def addNodeMutation(genome):
+    # addNodeMutation is one of the two mutations of the NEAT algorithm
+    # a connection between two nodes is disabled, and in its place a new node is added that spans the connection
+    # ie originally node 0 is connected to node 1
+    #   that original connection is disabled
+    #   now node 0 connects to node 2
+    #   and node 2 connects to node 1
+    global mutationDictionary   # the mutationDictionary is needed for a global collection of all genomes
+    global nodeCount            # nodeCount keeps track of how many nodes have been created across all genomes
+    global geneCount            # genomeCount keeps track of hamny new genes have been created
+    
+    randomGene = genome[randint(0,len(genome)-1)]   # a random gene is chosen
+    while randomGene.enabled != 1:                  # the gene must be enabled (because you cant disable a connection thats already disabled)
+        randomGene = genome[randint(0,len(genome)-1)]   # keep picking a gene until an enabled one is found
+    randomGene.enabled = 0  # disable the original connection
+    
+    newConnect1 = Connection(geneCount, randomGene.start, nodeCount, random()*2-1, 1) # build the first new connection TO the new node
+    newConnect2 = Connection(geneCount+1, nodeCount, randomGene.end, random()*2-1, 1) # build the second new connection FROM the new node
+    nodeCount += 1  # a new node is being created
+    
+    genome.append(newConnect1)  # add the new genes to the genome
+    genome.append(newConnect2)
+    
+    mutationDictionary[geneCount] = copy.copy(newConnect1)  # save a copy of the new genes to the global list
+    mutationDictionary[geneCount+1] = copy.copy(newConnect2)
+    geneCount += 2  # two genes were created
