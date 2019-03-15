@@ -2,6 +2,9 @@ import math
 from random import *
 import copy
 
+# NEAT or NeuroEvolutionary Augmented Topologies is a ML algorithm and is described best at the link below:
+# https://www.cs.cmu.edu/afs/cs/project/jair/pub/volume21/stanley04a-html/node3.html
+
 mutationDictionary = {}   # The global list of connections
 nodeCount = 0
 geneCount = 0
@@ -135,3 +138,29 @@ def addNodeMutation(genome):
     mutationDictionary[geneCount] = copy.copy(newConnect1)  # save a copy of the new genes to the global list
     mutationDictionary[geneCount+1] = copy.copy(newConnect2)
     geneCount += 2  # two genes were created
+
+def addConnectionMutation(genome):
+    # Creating a new connection is actually a nontrivial process
+    # The connection must go from a node that already has a connection coming out (ie not an output node)
+    # The connection must go to a node that already has an input connection (ie not an input node)
+    # The connection cannot go to a node that is connected back to the original node (ie no loops)
+    # No duplicate connections
+    global mutationDictionary   # the mutationDictionary is needed for a global collection of all genomes
+    global nodeCount            # nodeCount keeps track of how many nodes have been created across all genomes
+    global geneCount            # genomeCount keeps track of hamny new genes have been created
+
+    foundConnection = False
+    while foundConnection == False:
+        startNode = genome[randint(0,len(genome)-1)].start  # This means the start node already has at least one outgoing conenction
+        endNode = genome[randint(0,len(genome)-1)].end      # This means the end node already has at least one input conneciton
+        if startNode != endNode: # no loops
+            foundConnection = True  # begine checking through all other genes in genome
+            for gene in genome:
+                # check if any of the current genes are either the connection is already present or would create a loop
+                if (gene.start == startNode and gene.end == endNode) or (gene.end == startNode and gene.start == endNode):
+                    foundConnection = False
+                    break
+    
+    newCon = Connection(geneCount, startNode, endNode, random()*2-1, 1) # Create the new connection
+    mutationDictionary[geneCount] = newCon  # Save gene in global list of all genes
+    genome.append(copy.copy(newCon))    # Add a copy of the gene to the genome
