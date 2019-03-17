@@ -6,46 +6,47 @@ import copy
 # https://www.cs.cmu.edu/afs/cs/project/jair/pub/volume21/stanley04a-html/node3.html
 
 mutationDictionary = {}   # The global list of connections
-nodeCount = 0
-geneCount = 0
+nodeCount = 0   # global tracker for indexing new nodes
+geneCount = 0   # global tracker for indexing new genes
 
 class Connection:  
     # The connection stores information for how two nodes are connected
     def __init__(self, genomeIndex, startNode, endNode, w, enabled, isInput, isOutput):
-        self.index = genomeIndex
-        self.start = startNode  
-        self.end = endNode
-        self.weight = w
-        self.enabled = enabled
-        self.isInput = isInput
-        self.isOutput = isOutput
+        self.index = genomeIndex    # this is the key in genome.connections and the mutationDictionary
+        self.start = startNode      # the index of the starting node of this connection
+        self.end = endNode          # the index of the ending node of this connection
+        self.weight = w             # the weight of the connection
+        self.enabled = enabled      # whether this connection is enabled (or disabled)
+        self.isInput = isInput      # whether the starting node is an input node
+        self.isOutput = isOutput    # whether the ending node is an output node
 
 class Node:
     # Nodes store their connections and their value as its calculated
     def __init__(self, index, isInput, isOutput):
-        self.connections = []
-        self.index = index
-        self.value = 0
-        self.numInputs = 0
-        self.calcedInputs = 0
-        self.isInput = isInput
-        self.isOutput = isOutput
-    
-    def addConection(self, connection):
-        self.connections.append(connection)
+        self.connections = []       # the list of connections (used when calculating the network)
+        self.index = index          # this is the key in genome.nodes
+        self.value = 0              # this stores the value of the node during calculation
+        self.numInputs = 0          # keeps track of the total number of inputs the node has
+        self.calcedInputs = 0       # keeps track of how many inputs have been calculated (used when calculating the network)
+        self.isInput = isInput      # is the node an input node
+        self.isOutput = isOutput    # is the node an output node
 
 class Genome:
     # Genome stores the genes and nodes that define a network
     def __init__(self):
-        self.connections = {}
-        self.nodes = {}
-        self.inputNodes = []
-        self.outputNodes = []
+        self.connections = {}   # dictionary for all genes (key = connection index, value = gene)
+        self.nodes = {}         # dictionary for all nodes (key = node index, value = node)
+        self.inputNodes = []    # list of input nodes
+        self.outputNodes = []   # list of output nodes
 
 def calcNetwork(genome, inputs):
     # The process of calculating the network requires using a queue to tell which nodes have been calculated
     #   when a node has gotten all of its inputs, it is added to the queue
-    #   when there are no more items in the queue then the network has been calculated
+    #   when there are no more nodes in the queue then the network has been calculated
+
+    for node in list(genome.nodes.values()):    # set the value of all nodes to 0
+        node.value = 0
+
     setInputNodes(genome, inputs)    # The input nodes are set, and the process of calculating the outputs 
     nodeQueue = genome.inputNodes
     while len(nodeQueue) > 0:   # Loop until all nodes have been processed
