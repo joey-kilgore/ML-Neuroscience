@@ -1,5 +1,5 @@
 import math 
-from random import *
+import random
 import copy
 
 # NEAT or NeuroEvolutionary Augmented Topologies is a ML algorithm and is described best at the link below:
@@ -37,7 +37,7 @@ class Node:
 class Genome:
     # Genome stores the genes and nodes that define a network
     def __init__(self):
-        self.connections = []
+        self.connections = {}
         self.nodes = {}
         self.inputNodes = []
         self.outputNodes = []
@@ -65,20 +65,7 @@ def calcNetwork(genome, inputs):
 
 
 def activationFunction(num):
-    return 1 / (1 + math.exp(-num))
-
-def makeNodeList(genome):
-    nodeList = {}
-    # All the connections within the genome are checked for new nodes
-    for con in genome:
-        if con.enabled == True: # Some connections are disable later on (through making new nodes)
-            if not con.start in nodeList:   # if the starting node has not been observed before a new node is made
-                nodeList[con.start] = Node(con.start, con.isInput, 0)
-            nodeList[con.start].addConection(con)   # all starting nodes must store the connection (needed for calcNetwork)
-            if not con.end in nodeList:     # if the ending node has not been observed before a new node is made
-                nodeList[con.end] = Node(con.end, 0, con.isOutput)
-            nodeList[con.end].numInputs += 1    # all ending nodes must keep track of how many inputs they have (needed for calcNetwork)
-    return nodeList 
+    return 1 / (1 + math.exp(-num)) 
 
 def setInputNodes(genome, inputs):
     for i in range(len(inputs)):
@@ -101,9 +88,9 @@ def initGenome(numInputs, numOutputs):
             # ending node = the outputIndex+numInputs which goes from len(numInputs) to len(numInputs)+len(numOutputs)-1 
             # weight = random number from -1 to 1
             # enabled = 1 (ie the connection is enabled)
-            con = Connection(geneCount, inputIndex, outputIndex+numInputs, random()*2-1, 1, 1, 1) 
+            con = Connection(geneCount, inputIndex, outputIndex+numInputs, random.random()*2-1, 1, 1, 1) 
             mutationDictionary[geneCount] = copy.copy(con)     # a copy is saved to the global list
-            initGenome.connections.append(con)      # a reference is appended to the initial genome being created
+            initGenome.connections[geneCount] = con      # a reference is appended to the initial genome being created
             nodeConnections.append(con)             # the same reference is saved for making the list of connections for the node
             geneCount+=1    # a new gene was created so the geneCount is incremented
         newNode = Node(nodeCount, 1, 0) # generate a new input node
@@ -126,7 +113,7 @@ def initGenome(numInputs, numOutputs):
 
 def printGenome(genome):
     # printGenome gives a way of looking at all the genes of a genome
-    for con in genome.connections:
+    for con in genome.connections.values():
         print(str(con.index) + "\t" + str(con.start) + "->" + str(con.end) + "\t" + (str(con.weight) if con.enabled == 1 else "DISABLED\t") + "\t" + ("INPUT" if con.isInput==1 else "HIDDEN") + "\t" + ("OUTPUT" if con.isOutput==1 else "HIDDEN"))
 
 def addNodeMutation(genome):
@@ -140,20 +127,22 @@ def addNodeMutation(genome):
     global nodeCount            # nodeCount keeps track of how many nodes have been created across all genomes
     global geneCount            # genomeCount keeps track of hamny new genes have been created
     
-    randomGene = genome.connections[randint(0,len(genome.connections)-1)]   # a random gene is chosen
+    randomGene = random.choice(list(genome.connections.values()))   # a random gene is chosen
     while randomGene.enabled != 1:                  # the gene must be enabled (because you cant disable a connection thats already disabled)
-        randomGene = genome.connections[randint(0,len(genome.connections)-1)]   # keep picking a gene until an enabled one is found
+        randomGene = random.choice(list(genome.connections.values())) # keep picking a gene until an enabled one is found
     randomGene.enabled = 0  # disable the original connection
     
-    newConnect1 = Connection(geneCount, randomGene.start, nodeCount, random()*2-1, 1, randomGene.isInput, 0) # build the first new connection TO the new node
-    newConnect2 = Connection(geneCount+1, nodeCount, randomGene.end, random()*2-1, 1, 0, randomGene.isOutput) # build the second new connection FROM the new node
+    # build the first new connection TO the new node
+    newConnect1 = Connection(geneCount, randomGene.start, nodeCount, random.random()*2-1, 1, randomGene.isInput, 0) 
+    # build the second new connection FROM the new node
+    newConnect2 = Connection(geneCount+1, nodeCount, randomGene.end, random.random()*2-1, 1, 0, randomGene.isOutput) 
     newNode = Node(nodeCount,0,0)           # build the new hidden node
     newNode.connections.append(newConnect2) # add its connection out
     newNode.numInputs = 1                   # add its one connection in
     
-    genome.connections.append(newConnect1)  # add the new genes to the genome
-    genome.connections.append(newConnect2)
-    genome.nodes[nodeCount] = newNode   
+    genome.connections[geneCount] = newConnect1  # add the new genes to the genome
+    genome.connections[geneCount+1] = newConnect2
+    genome.nodes[nodeCount] = newNode   # add the new node to the genome
     
     mutationDictionary[geneCount] = copy.copy(newConnect1)  # save a copy of the new genes to the global list
     mutationDictionary[geneCount+1] = copy.copy(newConnect2)
@@ -176,16 +165,119 @@ def addConnectionMutation(genome):
 
     foundConnection = False
     while foundConnection == False:
-        startNode = genome.connections[randint(0,len(genome.connections)-1)].start  # This means the start node already has at least one outgoing conenction
-        endNode = genome.connections[randint(0,len(genome.connections)-1)].end      # This means the end node already has at least one input conneciton
+        startNode = random.choice(list(genome.connections.values())).start  # This means the start node already has at least one outgoing conenction
+        endNode = random.choice(list(genome.connections.values())).end      # This means the end node already has at least one input conneciton
         if startNode != endNode: # no loops
             foundConnection = True  # begine checking through all other genes in genome
-            for gene in genome.connections:
+            for gene in genome.connections.values():
                 # check if any of the current genes are either the connection is already present or would create a loop
                 if (gene.start == startNode and gene.end == endNode) or (gene.end == startNode and gene.start == endNode):
                     foundConnection = False
                     break
     
-    newCon = Connection(geneCount, startNode, endNode, random()*2-1, 1, genome.nodes[startNode].isInput, genome.nodes[endNode].isOutput) # Create the new connection
+    # Create the new connection
+    newCon = Connection(geneCount, startNode, endNode, random.random()*2-1, 1, genome.nodes[startNode].isInput, genome.nodes[endNode].isOutput)
     mutationDictionary[geneCount] = copy.copy(newCon)  # Save copy of gene in global list of all genes
-    genome.connections.append(newCon)    # Add a gene to genomes list of connections
+    genome.connections[geneCount] = newCon    # Add a gene to genomes list of connections
+    genome.nodes[newCon.start].connections.append(newCon)
+    genome.nodes[newCon.end].numInputs += 1
+    geneCount += 1  # a new gene was created
+
+def mutateGenome(genome):
+    newGenome = copy.deepcopy(genome)
+    addNodeMutation(newGenome)
+    return newGenome
+
+def crossGenomes(parent1, parent2):
+    global mutationDictionary   # the global dictionary of mutations is a key element in being able to cross genomes
+    global geneCount    # the global gene count is also useful
+    newGenome = Genome()
+    for geneIndex in range(geneCount):  # loop through ALL known genes
+        # check if the gene is in either parent, if not then the gene can be skipped
+        if geneIndex in parent1.connections or geneIndex in parent2.connections:
+            # if the gene is in only one parent then there is a 50% chance it will be skipped
+            if not (geneIndex in parent1.connections and geneIndex in parent2.connections) and random.random() > 0.5:
+                continue
+            
+            # the gene will be created
+            newGene = copy.copy(mutationDictionary[geneIndex])
+            
+            # one parent is chosen at random and if the gene is disabled in that genome, then the child genome will also be disabled
+            # if it is only in one parent than it it will be enabled
+            # also if both parents have the gene disabled than this will disable the gene
+            if random.random() > 0.5 and geneIndex in parent1.connections and parent1.connections[geneIndex].enabled == 0:
+                newGenome.connections[geneIndex] = newGene
+                newGene.enabled = 0
+                continue
+            elif geneIndex in parent2.connections and parent2.connections[geneIndex].enabled == 0:
+                newGenome.connections[geneIndex] = newGene
+                newGene.enabled = 0
+                continue
+
+            # at the this point the gene has been added and it is enabled
+            addGeneToGenome(newGenome, newGene) # add the gene to the genome
+
+    # the genome has a random selection of genes from the parents, but it may be missing input and output nodes
+    # both parents should have the same number so it doesn't matter which parent we check against
+    for node in parent1.inputNodes + parent1.outputNodes:
+        if not node.index in newGenome.nodes:
+            # find all possible valid connections from parents
+            validGenes = []
+            for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
+                if gene.enabled == 1 and gene.start == node.index:
+                    validGenes.append(gene)
+            chosenGene = random.choice(validGenes)  # pick a random valid gene
+            addGeneToGenome(newGenome, chosenGene)  # add it to the genome
+
+    # the genome has now been built but there are likely hidden or input nodes without connections out
+    # and there are likely hidden and output nodes without any inputs
+    isDone = False
+    while not isDone:   # keep making fixes until the netork needs no additional modifications
+        isDone = True
+        for node in list(newGenome.nodes.values()):
+            # check if the input or hidden nodes have at least one connection
+            if node.isOutput != 1 and len(node.connections) == 0:
+                # find all possible valid connections from parents
+                validGenes = []
+                for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
+                    if gene.enabled == 1 and gene.start == node.index:
+                        validGenes.append(gene)
+                chosenGene = random.choice(validGenes)  # pick a random valid gene
+                addGeneToGenome(newGenome, chosenGene)  # add it to the genome
+                isDone = False   # a modification was made
+            
+            # check if the output or hidden nodes have at least one input
+            if node.isInput != 1 and node.numInputs == 0:
+                # find all possible valid connections from parents
+                validGenes = []
+                for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
+                    if gene.enabled == 1 and gene.end == node.index:
+                        validGenes.append(gene)
+                chosenGene = random.choice(validGenes)  # pick a random valid gene
+                addGeneToGenome(newGenome, chosenGene)  # add it to the genome
+                isDone = False   # a modification was made
+    
+    # after the network is made and has been checked to elimate any unconnected nodes then the crossing is done
+    return newGenome
+    
+def addGeneToGenome(genome, gene):
+    # adding a gene to a genome requires more than simply adding it to the list of genes
+    # we must also check if new nodes need to be added to the genome as well
+    # the gene will be created
+    newGene = copy.copy(mutationDictionary[gene.index])
+    genome.connections[gene.index] = newGene    # the gene is added to the genome
+
+    # check if the nodes for the gene does not exist in the genome already
+    if not newGene.start in genome.nodes:
+        # if the start node does not exist add it (and add it to the input node list if necesary)
+        genome.nodes[newGene.start] = Node(newGene.start, newGene.isInput, 0)
+        if newGene.isInput == 1:
+            genome.inputNodes.append(genome.nodes[newGene.start])
+    genome.nodes[newGene.start].connections.append(newGene) # add the connection to the start node
+
+    if not newGene.end in genome.nodes:
+        # if the end node does not exist add it (and add it to the output node list if necesary)
+        genome.nodes[newGene.end] = Node(newGene.end, 0, newGene.isOutput)
+        if newGene.isOutput == 1:
+            genome.outputNodes.append(genome.nodes[newGene.end])
+    genome.nodes[newGene.end].numInputs += 1    # add to the number of inputs to the end node
