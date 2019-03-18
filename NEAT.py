@@ -296,7 +296,7 @@ def canAddConnection(genome):
             # input nodes must have a connection to every other node in the network if the network is full
             connectedNodes = []
             for con in node.connections:
-                if not con.end in connectedNodes:
+                if (not con.end in connectedNodes) and con.enabled == 1:
                     connectedNodes.append(con.end)
             # if there is less nodes connected to the input node than total non-input nodes, then there is at least one connection possible
             if len(connectedNodes) < (numNodes - numInputs):
@@ -308,7 +308,7 @@ def canAddConnection(genome):
             connectedNodes = []
             # check and find all nodes connected to the node
             for con in node.connections:
-                if not con.end in connectedNodes:
+                if (not con.end in connectedNodes) and con.enabled == 1:
                     connectedNodes.append(con.end)
             # check that any hidden nodes not connected out of this node are connected into this node
             for checkNode in list(genome.nodes.values()):
@@ -319,7 +319,7 @@ def canAddConnection(genome):
                     elif checkNode.isInput != 1:
                         # check if the hidden node is connected in
                         for con in checkNode.connections:
-                            if not con.end == node.index:
+                            if (not con.end == node.index) and con.enabled == 1:
                                 connectedNodes.append(con.end)
 
             # if there is less nodes connected to the input node than total non-input nodes, then there is at least one connection possible
