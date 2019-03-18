@@ -53,11 +53,12 @@ def calcNetwork(genome, inputs):
         curNode = nodeQueue[0]   # Dequeue the next node
         nodeQueue = nodeQueue[1:]
         for con in curNode.connections:
-            genome.nodes[con.end].value += con.weight * curNode.value  # The weight * value is added to the next nodes value
-            genome.nodes[con.end].calcedInputs+=1  # The number of calculated inputs is incrememted
-            if genome.nodes[con.end].numInputs == genome.nodes[con.end].calcedInputs : # All inputs have been calculated and the node can be activated
-                genome.nodes[con.end].value = activationFunction(genome.nodes[con.end].value)
-                nodeQueue.append(genome.nodes[con.end])    # After activating the node, it can be appended to the queue to be processed
+            if con.enabled == 1:    # ensure the connections are enabled
+                genome.nodes[con.end].value += con.weight * curNode.value  # The weight * value is added to the next nodes value
+                genome.nodes[con.end].calcedInputs+=1  # The number of calculated inputs is incrememted
+                if genome.nodes[con.end].numInputs == genome.nodes[con.end].calcedInputs : # All inputs have been calculated and the node can be activated
+                    genome.nodes[con.end].value = activationFunction(genome.nodes[con.end].value)
+                    nodeQueue.append(genome.nodes[con.end])    # After activating the node, it can be appended to the queue to be processed
     
     outputs = []
     for node in genome.outputNodes: # The final outputs are returned
@@ -151,7 +152,7 @@ def addNodeMutation(genome):
     nodeCount += 1  # a new node is being created
     geneCount += 2  # two genes were created
 
-    genome.nodes[randomGene.start].connections.remove(randomGene)   # now the original connection must be removed from the node
+    randomGene.enabled = 0   # now the original connection must be disabled
     genome.nodes[randomGene.start].connections.append(newConnect1)  # and the new connection is added
 
 def addConnectionMutation(genome):
@@ -282,3 +283,47 @@ def addGeneToGenome(genome, gene):
         if newGene.isOutput == 1:
             genome.outputNodes.append(genome.nodes[newGene.end])
     genome.nodes[newGene.end].numInputs += 1    # add to the number of inputs to the end node
+
+def canAddConnection(genome):
+    # check if it is possible to add another connection to the network (some networks may be fully connected)
+    numNodes = len(list(genome.nodes.values()))
+    numInputs = len(genome.inputNodes)
+    for node in list(genome.nodes.values()):
+        # we need to check the input and hidden nodes to ensure they have no more connections
+        if node.isOutput == 1:
+            continue    # output nodes can be skipped because they have no outgoing connections
+        elif node.isInput == 1:
+            # input nodes must have a connection to every other node in the network if the network is full
+            connectedNodes = []
+            for con in node.connections:
+                if not con.end in connectedNodes:
+                    connectedNodes.append(con.end)
+            # if there is less nodes connected to the input node than total non-input nodes, then there is at least one connection possible
+            if len(connectedNodes) < (numNodes - numInputs):
+                return True
+        else:
+            # now we must check hidden nodes
+            # they must be connected to all output nodes to be a full network
+            # they must also have or be connected to every other hidden node to be a full network
+            connectedNodes = []
+            # check and find all nodes connected to the node
+            for con in node.connections:
+                if not con.end in connectedNodes:
+                    connectedNodes.append(con.end)
+            # check that any hidden nodes not connected out of this node are connected into this node
+            for checkNode in list(genome.nodes.values()):
+                if (not checkNode.index in connectedNodes):
+                    if checkNode.isOutput == 1:
+                        # if the node that is not connected is an output then we found there is a possible connection
+                        return True
+                    elif checkNode.isInput != 1:
+                        # check if the hidden node is connected in
+                        for con in checkNode.connections:
+                            if not con.end == node.index:
+                                connectedNodes.append(con.end)
+
+            # if there is less nodes connected to the input node than total non-input nodes, then there is at least one connection possible
+            if len(connectedNodes) < (numNodes - numInputs):
+                return True
+    # all connections have been checked, and the network must be full
+    return False
