@@ -194,12 +194,17 @@ def mutateGenome(genome):
     global weightMutationChance
     global nodeMutationChance
     newGenome = copy.deepcopy(genome)
-    if canAddConnection(newGenome) and (random.random() < connectionMutationChance):
-        addConnectionMutation(newGenome)
-    if random.random() < weightMutationChance:
-        weightMutation(newGenome)
-    if random.random() < nodeMutationChance:
-        addNodeMutation(newGenome)
+    isDone = False
+    while not isDone:
+        if canAddConnection(newGenome) and (random.random() < connectionMutationChance):
+            addConnectionMutation(newGenome)
+            isDone = True
+        if random.random() < weightMutationChance:
+            weightMutation(newGenome)
+            isDone = True
+        if random.random() < nodeMutationChance:
+            addNodeMutation(newGenome)
+            isDone = True
     return newGenome
 
 def crossGenomes(parent1, parent2):
