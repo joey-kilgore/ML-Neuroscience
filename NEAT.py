@@ -9,6 +9,10 @@ mutationDictionary = {}   # The global list of connections
 nodeCount = 0   # global tracker for indexing new nodes
 geneCount = 0   # global tracker for indexing new genes
 
+weightMutationChance = .5
+connectionMutationChance = .5
+nodeMutationChance = .5
+
 class Connection:  
     # The connection stores information for how two nodes are connected
     def __init__(self, genomeIndex, startNode, endNode, w, enabled, isInput, isOutput):
@@ -186,8 +190,16 @@ def addConnectionMutation(genome):
     geneCount += 1  # a new gene was created
 
 def mutateGenome(genome):
+    global connectionMutationChance
+    global weightMutationChance
+    global nodeMutationChance
     newGenome = copy.deepcopy(genome)
-    addNodeMutation(newGenome)
+    if canAddConnection(newGenome) and (random.random() < connectionMutationChance):
+        addConnectionMutation(newGenome)
+    if random.random() < weightMutationChance:
+        weightMutation(newGenome)
+    if random.random() < nodeMutationChance:
+        addNodeMutation(newGenome)
     return newGenome
 
 def crossGenomes(parent1, parent2):
@@ -327,3 +339,9 @@ def canAddConnection(genome):
                 return True
     # all connections have been checked, and the network must be full
     return False
+
+def weightMutation(genome):
+    # this changes the value of all weights in the network
+    # it adjusts the weight by a value generated from a normal distribution
+    for con in list(genome.connections.values()):
+        con.weight += random.normalvariate(0, .1)
