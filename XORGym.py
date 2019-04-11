@@ -32,7 +32,7 @@ class XORGym:
     def setInput(self, action):
         # the action is a list given from the subject
         # points are awarded for getting closer to the actual value of the inputs XORed (maximum of 1 point)
-        self.score += 1 - abs(self.stateValue[self.currentTrial] - action[0])
+        self.score += 1 - abs(self.stateValue[self.currentTrial] - action)
 
     def isDone(self):
         # check if the fourth trial has been completed

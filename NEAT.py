@@ -9,9 +9,12 @@ mutationDictionary = {}   # The global list of connections
 nodeCount = 0   # global tracker for indexing new nodes
 geneCount = 0   # global tracker for indexing new genes
 
-weightMutationChance = .5
-connectionMutationChance = .5
-nodeMutationChance = .5
+weightMutationChance = .9
+changeWeightChance = .66
+newWeightChance = .15
+connectionMutationChance = .2
+nodeMutationChance = .15
+connectionEnableChance = .25
 
 class Connection:  
     # The connection stores information for how two nodes are connected
@@ -50,6 +53,7 @@ def calcNetwork(genome, inputs):
 
     for node in list(genome.nodes.values()):    # set the value of all nodes to 0
         node.value = 0
+        node.calcedInputs = 0
 
     setInputNodes(genome, inputs)    # The input nodes are set, and the process of calculating the outputs 
     nodeQueue = genome.inputNodes
@@ -71,7 +75,11 @@ def calcNetwork(genome, inputs):
 
 
 def activationFunction(num):
-    return 1 / (1 + math.exp(-num)) 
+    # return math.tanh(num) 
+    return 0 if num<0 else num
+
+def sigmoidActivationFunction(num):
+    return 1 / (1 + math.exp(-1 * num)) 
 
 def setInputNodes(genome, inputs):
     for i in range(len(inputs)):
@@ -111,6 +119,7 @@ def initGenome(numInputs, numOutputs):
     for outputIndex in range(numOutputs):
         newNode = Node(nodeCount, 0, 1) # create a new node, and set it as an output node
         initGenome.nodes[nodeCount] = newNode    # save the node to the node list
+        newNode.numInputs = numInputs
         outputNodes.append(newNode)         #   and to the list of output nodes
         nodeCount += 1  # a new node was created so the global index tracker is incremented
     initGenome.outputNodes = outputNodes
@@ -169,18 +178,22 @@ def addConnectionMutation(genome):
     global nodeCount            # nodeCount keeps track of how many nodes have been created across all genomes
     global geneCount            # genomeCount keeps track of hamny new genes have been created
 
-    foundConnection = False
-    while foundConnection == False:
-        startNode = random.choice(list(genome.connections.values())).start  # This means the start node already has at least one outgoing conenction
-        endNode = random.choice(list(genome.connections.values())).end      # This means the end node already has at least one input conneciton
-        if startNode != endNode: # no loops
-            foundConnection = True  # begine checking through all other genes in genome
-            for gene in genome.connections.values():
-                # check if any of the current genes are either the connection is already present or would create a loop
-                if (gene.start == startNode and gene.end == endNode) or (gene.end == startNode and gene.start == endNode):
-                    foundConnection = False
-                    break
-    
+    startEndPairs = []
+    for start in genome.nodes.values():
+        if start.isOutput != 1:
+            for end in genome.nodes.values():
+                if end.isInput !=1:
+                    isValidConnection = True
+                    for con in genome.connections.values():
+                        if (con.start == start.index and con.end == end.index) or (con.end == start.index and con.end == start.index):
+                            isValidConnection = False
+                    if isValidConnection:
+                        startEndPairs.append([start.index, end.index])
+    # pick random valid connection
+    startEndPair = random.choice(startEndPairs)
+    startNode = startEndPair[0]
+    endNode = startEndPair[1]
+
     # Create the new connection
     newCon = Connection(geneCount, startNode, endNode, random.random()*2-1, 1, genome.nodes[startNode].isInput, genome.nodes[endNode].isOutput)
     mutationDictionary[geneCount] = copy.copy(newCon)  # Save copy of gene in global list of all genes
@@ -196,15 +209,15 @@ def mutateGenome(genome):
     newGenome = copy.deepcopy(genome)
     isDone = False
     while not isDone:
+        if random.random() < nodeMutationChance:
+            addNodeMutation(newGenome)
+            isDone = True
         if canAddConnection(newGenome) and (random.random() < connectionMutationChance):
             addConnectionMutation(newGenome)
             isDone = True
         if random.random() < weightMutationChance:
             weightMutation(newGenome)
-            isDone = True
-        if random.random() < nodeMutationChance:
-            addNodeMutation(newGenome)
-            isDone = True
+            isDone = True   
     return newGenome
 
 def crossGenomes(parent1, parent2):
@@ -243,7 +256,7 @@ def crossGenomes(parent1, parent2):
             # find all possible valid connections from parents
             validGenes = []
             for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
-                if gene.enabled == 1 and gene.start == node.index:
+                if gene.enabled == 1 and (gene.start == node.index or gene.end == node.index):
                     validGenes.append(gene)
             chosenGene = random.choice(validGenes)  # pick a random valid gene
             addGeneToGenome(newGenome, chosenGene)  # add it to the genome
@@ -302,51 +315,30 @@ def addGeneToGenome(genome, gene):
     genome.nodes[newGene.end].numInputs += 1    # add to the number of inputs to the end node
 
 def canAddConnection(genome):
-    # check if it is possible to add another connection to the network (some networks may be fully connected)
-    numNodes = len(list(genome.nodes.values()))
-    numInputs = len(genome.inputNodes)
-    for node in list(genome.nodes.values()):
-        # we need to check the input and hidden nodes to ensure they have no more connections
-        if node.isOutput == 1:
-            continue    # output nodes can be skipped because they have no outgoing connections
-        elif node.isInput == 1:
-            # input nodes must have a connection to every other node in the network if the network is full
-            connectedNodes = []
-            for con in node.connections:
-                if (not con.end in connectedNodes) and con.enabled == 1:
-                    connectedNodes.append(con.end)
-            # if there is less nodes connected to the input node than total non-input nodes, then there is at least one connection possible
-            if len(connectedNodes) < (numNodes - numInputs):
-                return True
-        else:
-            # now we must check hidden nodes
-            # they must be connected to all output nodes to be a full network
-            # they must also have or be connected to every other hidden node to be a full network
-            connectedNodes = []
-            # check and find all nodes connected to the node
-            for con in node.connections:
-                if (not con.end in connectedNodes) and con.enabled == 1:
-                    connectedNodes.append(con.end)
-            # check that any hidden nodes not connected out of this node are connected into this node
-            for checkNode in list(genome.nodes.values()):
-                if (not checkNode.index in connectedNodes):
-                    if checkNode.isOutput == 1:
-                        # if the node that is not connected is an output then we found there is a possible connection
-                        return True
-                    elif checkNode.isInput != 1:
-                        # check if the hidden node is connected in
-                        for con in checkNode.connections:
-                            if (not con.end == node.index) and con.enabled == 1:
-                                connectedNodes.append(con.end)
-
-            # if there is less nodes connected to the input node than total non-input nodes, then there is at least one connection possible
-            if len(connectedNodes) < (numNodes - numInputs):
-                return True
-    # all connections have been checked, and the network must be full
-    return False
+    startEndPairs = []
+    for start in genome.nodes.values():
+        if start.isOutput != 1:
+            for end in genome.nodes.values():
+                if end.isInput !=1:
+                    isValidConnection = True
+                    for con in genome.connections.values():
+                        if (con.start == start.index and con.end == end.index) or (con.end == start.index and con.end == start.index):
+                            isValidConnection = False
+                    if isValidConnection:
+                        startEndPairs.append([start.index, end.index])
+    return False if len(startEndPairs) == 0 else True
 
 def weightMutation(genome):
     # this changes the value of all weights in the network
     # it adjusts the weight by a value generated from a normal distribution
+    global connectionEnableChance
+    global newWeightChance
+    global changeWeightChance
     for con in list(genome.connections.values()):
-        con.weight += random.normalvariate(0, .1)
+
+        if random.random() < newWeightChance:
+            con.weight = random.random()*2 -1
+        elif random.random()< changeWeightChance:
+            con.weight = random.normalvariate(0, .2)
+        if con.enabled == 0 and random.random()<connectionEnableChance:
+            con.enabled = 1
