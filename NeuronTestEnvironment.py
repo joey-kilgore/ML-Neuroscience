@@ -16,11 +16,13 @@ def neuronTest(nets):
     startTime = time.time()
     leftSpike = 0
     rightSpike = 0
+    baseLineRunTime += 1000
     for net in nets:
         h('init()')
         h('steprun()') # init step
         score = 0
-        for steps in range(10000):
+        # output = [.2,-.1]
+        for steps in range(baseLineRunTime):
             # gather inputs
             inputs = []
             for i in range(101):
@@ -43,7 +45,7 @@ def neuronTest(nets):
                 rightSpike = 0
             if (h.node[10].v > -10) and (leftSpike == 0):
                 leftSpike = 1
-                score += 1
+                score -= .5
             if (h.node[10].v < -10) and (leftSpike == 1):
                 leftSpike = 0
                 

@@ -1,5 +1,6 @@
 import NEAT
-import XORGym
+# import XORGym
+import NeuronGym
 import random
 import copy
 from multiprocessing.dummy import Pool as ThreadPool
@@ -10,25 +11,26 @@ def test(genome, gym):
     # return the score the genome achieved
     gymCopy = copy.deepcopy(gym)
     while not gymCopy.isDone():
-        gymCopy.setInput(NEAT.sigmoidActivationFunction(10 * NEAT.calcNetwork(genome, gymCopy.getState())[0]))
+        gymCopy.setInput(NEAT.calcNetwork(genome, gymCopy.getState()))
     score = gymCopy.getScore()
     return score
 
 
 def makeNextGen(i, bestGenomes, sizeOfGenerations):
     # make a new genome from the best genomes
-    # half of genomes will be a cross of two parents, and half will be a mutation of one genome
-    if i < sizeOfGenerations/4:
-        parents = findParents(bestGenomes)
-        return NEAT.crossGenomes(parents[0],parents[1])
-    else:
-        return NEAT.mutateGenome(random.choice(bestGenomes))
+    parents = findParents(bestGenomes)
+    newGene = NEAT.crossGenomes(parents[0],parents[1])
+    if random.random() < .5:
+        return NEAT.mutateGenome(newGene)
+    return newGene
 
 def train(gym, numGenerations, sizeOfGenerations):
     # based on only a gym, generations are created to maximize their performance
 
     # the initial genome is the first genome created and needs to be created seperately
     initGenome = NEAT.initGenome(gym.numInputs, gym.numOutputs)
+    NEAT.addNodeMutation(initGenome)
+    NEAT.addNodeMutation(initGenome)
     generation = [initGenome]
 
     bestScore = 0
@@ -61,14 +63,14 @@ def train(gym, numGenerations, sizeOfGenerations):
             generation.append(makeNextGen(i,topGenomes,sizeOfGenerations))
 
         # output performance metrics 
-        printGenerationStats(gen,scores, bestScore, bestGenome, gym)
+        printGenerationStats(gen,scores, bestScore, topGenomes[0], gym)
     return bestGenome
     
 def findTopGenomes(origscores, origgeneration):
     scores = copy.copy(origscores)
     generation = copy.deepcopy(origgeneration)
     topGenomes = []
-    for i in range(int(len(generation)/10)):
+    for i in range(int(len(generation)/2)):
         topScore = 0
         topGenome = None
         for j in range(len(scores)):
@@ -101,14 +103,14 @@ def printGenerationStats(gen, scores, bestScore, bestGenome, gym):
     while not gym.isDone():
         state = gym.getState()
         setValues = NEAT.calcNetwork(bestGenome, state)
-        setValue = NEAT.sigmoidActivationFunction(10*setValues[0])
+        setValue = setValues[0]
         gym.setInput(setValue)
         print(str(state) + " -> " + str(setValue))
     score = gym.getScore()
 
 
-testGym = XORGym.XORGym()
-genome = train(testGym, 100, 100)
+testGym = NeuronGym.NeuronGym()
+genome = train(testGym, 100, 300)
 # while not testGym.isDone():
 #     state = testGym.getState()
 #     print("STATE " + str(state))
@@ -118,3 +120,4 @@ genome = train(testGym, 100, 100)
 # print(testGym.getScore())
 print("BEST SCORE")
 print(test(genome, testGym))
+

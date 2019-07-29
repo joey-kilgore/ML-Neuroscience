@@ -1,7 +1,7 @@
 import math 
 import random
 import copy
-
+import sys
 # NEAT or NeuroEvolutionary Augmented Topologies is a ML algorithm and is described best at the link below:
 # https://www.cs.cmu.edu/afs/cs/project/jair/pub/volume21/stanley04a-html/node3.html
 
@@ -10,11 +10,14 @@ nodeCount = 0   # global tracker for indexing new nodes
 geneCount = 0   # global tracker for indexing new genes
 
 weightMutationChance = .9
-changeWeightChance = .66
+changeWeightChance = .85
 newWeightChance = .15
-connectionMutationChance = .2
-nodeMutationChance = .15
+connectionMutationChance = .4
+nodeMutationChance = .001
 connectionEnableChance = .25
+connectionDisableChance = .25
+
+errorCount = 0
 
 class Connection:  
     # The connection stores information for how two nodes are connected
@@ -50,7 +53,7 @@ def calcNetwork(genome, inputs):
     # The process of calculating the network requires using a queue to tell which nodes have been calculated
     #   when a node has gotten all of its inputs, it is added to the queue
     #   when there are no more nodes in the queue then the network has been calculated
-
+    global errorCount
     for node in list(genome.nodes.values()):    # set the value of all nodes to 0
         node.value = 0
         node.calcedInputs = 0
@@ -65,8 +68,11 @@ def calcNetwork(genome, inputs):
                 genome.nodes[con.end].value += con.weight * curNode.value  # The weight * value is added to the next nodes value
                 genome.nodes[con.end].calcedInputs+=1  # The number of calculated inputs is incrememted
                 if genome.nodes[con.end].numInputs == genome.nodes[con.end].calcedInputs : # All inputs have been calculated and the node can be activated
-                    genome.nodes[con.end].value = activationFunction(genome.nodes[con.end].value)
-                    nodeQueue.append(genome.nodes[con.end])    # After activating the node, it can be appended to the queue to be processed
+                    if con.isOutput == 1:
+                        genome.nodes[con.end].value = sigmoidActivationFunction(genome.nodes[con.end].value)
+                    else:
+                        genome.nodes[con.end].value = activationFunction(genome.nodes[con.end].value)
+                        nodeQueue.append(genome.nodes[con.end])    # After activating the node, it can be appended to the queue to be processed
     
     outputs = []
     for node in genome.outputNodes: # The final outputs are returned
@@ -256,10 +262,11 @@ def crossGenomes(parent1, parent2):
             # find all possible valid connections from parents
             validGenes = []
             for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
-                if gene.enabled == 1 and (gene.start == node.index or gene.end == node.index):
+                if (gene.start == node.index or gene.end == node.index):
                     validGenes.append(gene)
-            chosenGene = random.choice(validGenes)  # pick a random valid gene
-            addGeneToGenome(newGenome, chosenGene)  # add it to the genome
+            if len(validGenes) > 0:
+                chosenGene = random.choice(validGenes)  # pick a random valid gene
+                addGeneToGenome(newGenome, chosenGene)  # add it to the genome
 
     # the genome has now been built but there are likely hidden or input nodes without connections out
     # and there are likely hidden and output nodes without any inputs
@@ -268,26 +275,34 @@ def crossGenomes(parent1, parent2):
         isDone = True
         for node in list(newGenome.nodes.values()):
             # check if the input or hidden nodes have at least one connection
-            if node.isOutput != 1 and len(node.connections) == 0:
+            validConnections = 0
+            for con in node.connections:
+                if con.enabled:
+                    validConnections += 1
+            if node.isOutput != 1 and validConnections == 0:
                 # find all possible valid connections from parents
                 validGenes = []
                 for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
-                    if gene.enabled == 1 and gene.start == node.index:
+                    if gene.start == node.index:
+                        gene.enabled = 1
                         validGenes.append(gene)
-                chosenGene = random.choice(validGenes)  # pick a random valid gene
-                addGeneToGenome(newGenome, chosenGene)  # add it to the genome
-                isDone = False   # a modification was made
+                if len(validGenes) > 0:
+                    chosenGene = random.choice(validGenes)  # pick a random valid gene
+                    addGeneToGenome(newGenome, chosenGene)  # add it to the genome
+                    isDone = False   # a modification was made
             
             # check if the output or hidden nodes have at least one input
             if node.isInput != 1 and node.numInputs == 0:
                 # find all possible valid connections from parents
                 validGenes = []
                 for gene in list(parent1.connections.values()) + list(parent2.connections.values()):
-                    if gene.enabled == 1 and gene.end == node.index:
+                    if gene.end == node.index:
+                        gene.enabled = 1
                         validGenes.append(gene)
-                chosenGene = random.choice(validGenes)  # pick a random valid gene
-                addGeneToGenome(newGenome, chosenGene)  # add it to the genome
-                isDone = False   # a modification was made
+                if len(validGenes) > 0:
+                    chosenGene = random.choice(validGenes)  # pick a random valid gene
+                    addGeneToGenome(newGenome, chosenGene)  # add it to the genome
+                    isDone = False   # a modification was made
     
     # after the network is made and has been checked to elimate any unconnected nodes then the crossing is done
     return newGenome
@@ -315,7 +330,6 @@ def addGeneToGenome(genome, gene):
     genome.nodes[newGene.end].numInputs += 1    # add to the number of inputs to the end node
 
 def canAddConnection(genome):
-    startEndPairs = []
     for start in genome.nodes.values():
         if start.isOutput != 1:
             for end in genome.nodes.values():
@@ -325,13 +339,14 @@ def canAddConnection(genome):
                         if (con.start == start.index and con.end == end.index) or (con.end == start.index and con.end == start.index):
                             isValidConnection = False
                     if isValidConnection:
-                        startEndPairs.append([start.index, end.index])
-    return False if len(startEndPairs) == 0 else True
+                        return True
+    return False 
 
 def weightMutation(genome):
     # this changes the value of all weights in the network
     # it adjusts the weight by a value generated from a normal distribution
     global connectionEnableChance
+    global connectionDisableChance
     global newWeightChance
     global changeWeightChance
     for con in list(genome.connections.values()):
@@ -339,6 +354,10 @@ def weightMutation(genome):
         if random.random() < newWeightChance:
             con.weight = random.random()*2 -1
         elif random.random()< changeWeightChance:
-            con.weight = random.normalvariate(0, .2)
+            con.weight += random.normalvariate(0, .2)
         if con.enabled == 0 and random.random()<connectionEnableChance:
             con.enabled = 1
+            genome.nodes[con.end].numInputs += 1
+        elif con.enabled == 1 and random.random()<connectionDisableChance:
+            con.enabled = 0
+            genome.nodes[con.end].numInputs -= 1
